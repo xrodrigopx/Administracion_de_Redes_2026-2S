@@ -8,9 +8,9 @@ Antes de arrancar con este curso, hay que repasar los conceptos vistos en [Redes
 
 Para poder ubicar en qué capa opera cada protocolo que se ve en este curso (RIP/OSPF en capa 3, VoIP en capas de transporte y aplicación, etc.).
 
-- [Fundamentos de Redes de Datos y Modelos de Comunicación](https://github.com/xrodrigopx/Redes-de-Datos-2502/blob/main/2025-08-14%20Fundamentos%20de%20Redes%20de%20Datos%20y%20Modelos%20de%20Comunicaci%C3%B3n.md)
+- [Fundamentos de Redes de Datos y Modelos de Comunicación](https://github.com/xrodrigopx/Redes-de-Datos-2502/blob/main/2025-08-14%20Fundamentos%20de%20Redes%20de%20Datos%20y%20Modelos%20de%20Comunicacio%CC%81n.md)
 - [Modelo OSI](https://github.com/xrodrigopx/Redes-de-Datos-2502/blob/main/2025-08-18%20Modelo%20OSI.md)
-- [Modelo Híbrido](https://github.com/xrodrigopx/Redes-de-Datos-2502/blob/main/2025-08-18%20Modelo%20H%C3%ADbrido.md)
+- [Modelo Híbrido](https://github.com/xrodrigopx/Redes-de-Datos-2502/blob/main/2025-08-18%20Modelo%20Hi%CC%81brido.md)
 
 ### Capa de Enlace de Datos, Switches y VLAN
 
@@ -47,4 +47,4 @@ Necesaria para entender [07-09-2026 QoS](2026-09-07%20QoS.md) (priorización de 
 
 Base para la clase de [16-11-2026 Internet - Presentación de la tarea](2026-11-16%20Internet%20-%20Presentaci%C3%B3n%20de%20la%20tarea.md).
 
-- [Capa de Aplicación](https://github.com/xrodrigopx/Redes-de-Datos-2502/blob/main/2025-10-14%20Capa%20de%20Aplicaci%C3%B3n.md)
+- [Capa de Aplicación](https://github.com/xrodrigopx/Redes-de-Datos-2502/blob/main/2025-10-14%20Capa%20de%20Aplicacio%CC%81n.md)
