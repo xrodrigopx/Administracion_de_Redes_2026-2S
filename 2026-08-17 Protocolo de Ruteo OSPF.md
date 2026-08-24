@@ -352,3 +352,93 @@ Cuando un router arma su tabla de ruteo con información de varias áreas, proce
 3. Por último, los LSAs tipo 5 (rutas externas al sistema autónomo).
 
 Este orden asegura que OSPF siempre prefiera, en este orden: rutas dentro de la propia área, después rutas hacia otras áreas del mismo AS, y recién al final rutas hacia otros sistemas autónomos.
+
+
+# Comandos Útiles CISCO IOS
+
+1) ENTRAR A CONFIG GLOBAL
+Router> enable
+Router# configure terminal
+
+2) (OPCIONAL) LOOPBACK PARA ROUTER-ID ESTABLE
+Router(config)# interface loopback0
+Router(config-if)# ip address <ip> 255.255.255.255
+Router(config-if)# exit
+
+3) ARRANCAR PROCESO OSPF
+<id-proceso> es un numero arbitrario que vos elegis (1-65535). Es local al router, NO hace falta que coincida entre routers. Por convencion se suele usar el mismo en todo el lab para simplificar.
+Router(config)# router ospf 1
+
+4) ROUTER ID MANUAL (dentro de router ospf)
+Router(config-router)# router-id <ip>
+ej: Router(config-router)# router-id 1.1.1.1
+
+5) ANUNCIAR REDES (dentro de router ospf)
+network <red> <wildcard> area <area-id>
+
+<red>: la direccion de red de la interfaz (fijate la IP con show ip interface brief y calculala segun su mascara)
+<wildcard>: la mascara invertida (255 - cada octeto)
+  255.255.255.0   -> 0.0.0.255
+  255.255.255.252 -> 0.0.0.3
+  255.255.0.0     -> 0.0.255.255
+<area-id>: la definis vos/el profe. Si es area unica, se usa area 0. Si es multi-area, hay que fijarse que interfaz va en que area.
+
+Ejemplo, interfaz 192.168.1.1 /24, area unica:
+Router(config-router)# network 192.168.1.0 0.0.0.255 area 0
+
+Ejemplo, link punto a punto 10.0.0.1 /30:
+Router(config-router)# network 10.0.0.0 0.0.0.3 area 0
+
+Si el router tiene varias interfaces, se repite una linea por cada una:
+Router(config-router)# network 192.168.1.0 0.0.0.255 area 0
+Router(config-router)# network 192.168.2.0 0.0.0.255 area 0
+Router(config-router)# network 10.0.0.0 0.0.0.3 area 0
+
+6) SALIR
+Router(config-router)# exit
+
+7) COSTO EN UNA INTERFAZ (modo interfaz)
+Router(config-if)# bandwidth <kbps>
+Router(config-if)# ip ospf cost <valor>
+ej: Router(config-if)# ip ospf cost 20
+
+8) REFERENCE BANDWIDTH (dentro de router ospf, mismo valor en TODOS los routers)
+Router(config-router)# auto-cost reference-bandwidth <valor-en-Mbps>
+ej: Router(config-router)# auto-cost reference-bandwidth 10000
+
+9) PRIORIDAD DR/BDR (modo interfaz)
+Router(config-if)# ip ospf priority <valor>
+ej: Router(config-if)# ip ospf priority 100
+(prioridad 0 = nunca puede ser DR/BDR)
+
+10) INTERFAZ PASIVA (dentro de router ospf, no manda Hellos por esa interfaz)
+Router(config-router)# passive-interface <interfaz>
+ej: Router(config-router)# passive-interface GigabitEthernet0/1
+
+11) AUTENTICACION (modo interfaz)
+Router(config-if)# ip ospf authentication
+Router(config-if)# ip ospf authentication-key <clave>
+ej: Router(config-if)# ip ospf authentication-key cisco123
+
+VERIFICACION (modo EXEC privilegiado, sin configure terminal)
+Router# show ip ospf neighbor
+Router# show ip ospf interface
+Router# show ip ospf interface brief
+Router# show ip ospf database
+Router# show ip protocols
+Router# show ip ospf
+Router# show ip route
+Router# show ip route ospf
+
+GUARDAR CONFIG
+Router# copy running-config startup-config
+(o: Router# write memory)
+
+---
+TIPS RAPIDOS:
+- wildcard = mascara invertida (255.255.255.0 -> 0.0.0.0.255)
+- id-proceso en "router ospf X" es local, no coincide entre routers
+- area-id si es una sola area, casi siempre 0; si es multi-area, todas deben tocar el area 0
+- HelloInterval debe coincidir entre vecinos para formar adyacencia
+- multicast OSPF: 224.0.0.5 (todos), 224.0.0.6 (DR/BDR)
+- rutas OSPF en la tabla de ruteo aparecen marcadas con O
