@@ -1,0 +1,518 @@
+GUIA PASO A PASO - LABORATORIO 1 - RED DE CAPA 3 - OSPF/BGP/NAT
+==================================================================
+
+Topologia (segun media/image4.png):
+- Area 0 (backbone): R1, R2, R3, R5
+- Area 1: R2 - R4 (Sucursal 1)
+- Area 2: R3 - R6 (Sucursal 2)
+- R1 es ASBR, conecta via enlace WAN 192.0.2.0/24 con R7 (AS 64497, ISP)
+- R7 conecta a Internet a traves de un nodo NAT (DHCP en R7-f0/0)
+- LAN Casa Central: 172.16.0.0/24 en R1 (SwitchC, Debnet-1)
+- LAN Sucursal 1: 172.17.0.0/24 en R4 (SwitchS1, Debnet-2)
+- LAN Sucursal 2: 172.18.0.0/24 en R6 (SwitchS2, Debnet-3)
+
+
+PASO 1 - ARMADO DE LA MAQUETA EN GNS3
+--------------------------------------
+1. Conectarse al servidor GNS3: http://labacademicoucu.myddns.me:3080
+   Usuario/contrasena: grupox / Grupoxucu
+2. Crear un proyecto nuevo con "Add Blank Project", nombrarlo Lab1.Grupox.2026
+3. Armar la topologia igual a la figura del documento (image4.png):
+   7 routers C7200 (R1 a R7), 3 switches (SwitchC, SwitchS1, SwitchS2),
+   3 dispositivos Docker (Debnet-1, Debnet-2, Debnet-3), 1 nodo NAT
+4. Interconectar todo con el simbolo de cable segun la topologia
+5. Iniciar la simulacion (boton Play)
+
+
+PASO 2 - CONFIGURACION INICIAL: DIRECCIONAMIENTO IP
+------------------------------------------------------
+En cada router: enable -> configure terminal -> interface X ->
+ip address a.b.c.d mascara -> no shutdown
+
+R1:
+  interface FastEthernet0/0        (enlace a R7 - WAN ISP)
+  ip address 192.0.2.1 255.255.255.252
+  no shutdown
+  interface FastEthernet1/0        (LAN Casa Central)
+  ip address 172.16.0.1 255.255.255.0
+  no shutdown
+  interface GigabitEthernet2/0     (enlace a R2)
+  ip address 10.0.0.1 255.255.255.252
+  no shutdown
+  interface GigabitEthernet3/0     (enlace a R3)
+  ip address 10.0.0.5 255.255.255.252
+  no shutdown
+
+R2:
+  interface GigabitEthernet2/0     (enlace a R1)
+  ip address 10.0.0.2 255.255.255.252
+  no shutdown
+  interface GigabitEthernet3/0     (enlace a R5)
+  ip address 10.0.0.9 255.255.255.252
+  no shutdown
+  interface GigabitEthernet4/0     (enlace a R4)
+  ip address 10.0.10.1 255.255.255.252
+  no shutdown
+
+R3:
+  interface GigabitEthernet2/0     (enlace a R1)
+  ip address 10.0.0.6 255.255.255.252
+  no shutdown
+  interface GigabitEthernet3/0     (enlace a R5)
+  ip address 10.0.0.13 255.255.255.252
+  no shutdown
+  interface GigabitEthernet4/0     (enlace a R6)
+  ip address 10.0.20.1 255.255.255.252
+  no shutdown
+
+R4:
+  interface GigabitEthernet2/0     (enlace a R2)
+  ip address 10.0.10.2 255.255.255.252
+  no shutdown
+  interface FastEthernet0/0        (LAN Sucursal 1)
+  ip address 172.17.0.1 255.255.255.0
+  no shutdown
+
+R5:
+  interface GigabitEthernet2/0     (enlace a R2)
+  ip address 10.0.0.10 255.255.255.252
+  no shutdown
+  interface GigabitEthernet3/0     (enlace a R3)
+  ip address 10.0.0.14 255.255.255.252
+  no shutdown
+
+R6:
+  interface GigabitEthernet2/0     (enlace a R3)
+  ip address 10.0.20.2 255.255.255.252
+  no shutdown
+  interface FastEthernet0/0        (LAN Sucursal 2)
+  ip address 172.18.0.1 255.255.255.0
+  no shutdown
+
+R7:
+  interface FastEthernet0/0        (hacia Internet / NAT)
+  no shutdown
+  ip address dhcp
+  interface FastEthernet1/0        (enlace a R1)
+  ip address 192.0.2.2 255.255.255.252
+  no shutdown
+
+  Configuracion DNS opcional en R7:
+  ip name-server 200.40.30.245
+  ip domain lookup
+
+  Anotar en la tabla de direccionamiento del documento la IP que
+  R7 recibe por DHCP (aparece en el log %DHCP-6-ADDRESS_ASSIGN).
+  Probar: ping www.google.com desde R7.
+
+Verificar en cada router: do show ip interface brief
+Todas las interfaces deben quedar en estado "up / up".
+Al terminar cada router: write (para salvar la configuracion).
+
+Configuracion de los contenedores Debnet (editar /etc/network/interfaces
+con vi o nano, sacar comentarios y ajustar IP/gateway):
+
+Debnet-1 (Casa Central):
+  address 172.16.0.2
+  netmask 255.255.255.0
+  gateway 172.16.0.1
+
+Debnet-2 (Sucursal 1):
+  address 172.17.0.2
+  netmask 255.255.255.0
+  gateway 172.17.0.1
+
+Debnet-3 (Sucursal 2):
+  address 172.18.0.2
+  netmask 255.255.255.0
+  gateway 172.18.0.1
+
+Opcional DNS en cada Debnet, editar /etc/resolv.conf:
+  nameserver 200.40.30.245
+
+Luego en cada uno: ifup eth0 y probar ping al gateway correspondiente.
+
+
+PASO 3 - TABLAS DE ENRUTAMIENTO (ANTES DE OSPF)
+--------------------------------------------------
+Ejecutar en R1 y R7: show ip route
+Completar la tabla del documento solo con entradas tipo C (Connected),
+sin incluir las de tipo L (Local).
+
+R1 deberia mostrar 4 redes conectadas:
+  172.16.0.0/24, 192.0.2.0/24, 10.0.0.0/30, 10.0.0.4/30
+
+R7 deberia mostrar 2 redes conectadas:
+  192.0.2.0/24 y la red DHCP asignada por el NAT en f0/0
+
+
+PASO 4 - PRUEBA DE CONECTIVIDAD (ANTES DE OSPF)
+--------------------------------------------------
+Desde Debnet-2 (172.17.0.2, Sucursal 1) hacer ping a Debnet-1
+(172.16.0.2, Casa Central).
+
+Resultado esperado: el ping FALLA (timeout).
+
+Justificacion para completar en el documento: R4 solo conoce sus
+redes directamente conectadas (172.17.0.0/24 y 10.0.10.0/30). No
+existe todavia ningun protocolo de ruteo dinamico ni rutas estaticas
+que le indiquen como llegar a 172.16.0.0/24, por lo que el paquete
+no puede salir del segmento local de R4. Este resultado es intencional:
+sirve para justificar por que hace falta configurar un protocolo de
+ruteo dinamico (OSPF, siguiente paso).
+
+
+PASO 5 - CONFIGURACION DE OSPF MULTI-AREA
+---------------------------------------------
+IMPORTANTE: el enlace R1-R7 (192.0.2.0/24) NO se incluye en OSPF,
+porque es el peering BGP con el ISP (se configura en el Paso 8).
+
+R1 (Area 0):
+  router ospf 1
+  network 10.0.0.0 0.0.0.3 area 0
+  network 10.0.0.4 0.0.0.3 area 0
+  network 172.16.0.0 0.0.0.255 area 0
+  passive-interface FastEthernet1/0
+
+R2 (ABR entre Area 0 y Area 1):
+  router ospf 1
+  network 10.0.0.0 0.0.0.3 area 0
+  network 10.0.0.8 0.0.0.3 area 0
+  network 10.0.10.0 0.0.0.3 area 1
+
+R3 (ABR entre Area 0 y Area 2):
+  router ospf 1
+  network 10.0.0.4 0.0.0.3 area 0
+  network 10.0.0.12 0.0.0.3 area 0
+  network 10.0.20.0 0.0.0.3 area 2
+
+R5 (Area 0):
+  router ospf 1
+  network 10.0.0.8 0.0.0.3 area 0
+  network 10.0.0.12 0.0.0.3 area 0
+
+R4 (Area 1):
+  router ospf 1
+  network 10.0.10.0 0.0.0.3 area 1
+  network 172.17.0.0 0.0.0.255 area 1
+  passive-interface FastEthernet0/0
+
+R6 (Area 2):
+  router ospf 1
+  network 10.0.20.0 0.0.0.3 area 2
+  network 172.18.0.0 0.0.0.255 area 2
+  passive-interface FastEthernet0/0
+
+R7: NO se configura OSPF (queda fuera del dominio interno, es el
+router del proveedor de Internet en otro AS).
+
+
+PASO 6 - VERIFICACION DE VECINDADES Y ROUTER ID
+----------------------------------------------------
+Ejecutar en al menos dos routers (por ejemplo R1 y R2):
+  show ip ospf neighbor
+
+Completar la tabla con Neighbor ID, State, Dead Time, Address,
+Interface para cada vecino visto.
+
+Sobre el Router ID (RID):
+Sin loopback configurada, Cisco IOS elige como RID la IP mas alta
+entre TODAS las interfaces activas del router (no solo las que
+corren OSPF), en el momento en que arranca el proceso OSPF.
+Por eso en R1 el RID probablemente sea 192.0.2.1 (la interfaz hacia
+R7), aunque esa interfaz ni siquiera participa en OSPF, porque
+192.x.x.x es numericamente mayor que 172.16.x.x y 10.x.x.x.
+
+Configurar una interfaz loopback con IP del rango 192.168.1.0/24
+(ultimo octeto = numero de router) en la vecindad elegida:
+
+  R2:
+  interface loopback 0
+  ip address 192.168.1.2 255.255.255.255
+
+Reiniciar el proceso OSPF y verificar si cambia el RID:
+  R2#clear ip ospf process
+  Reset ALL OSPF processes? [no]: yes
+
+Resultado esperado: el RID normalmente NO cambia con solo el clear,
+porque el RID se fija al iniciar el proceso y no se recalcula solo.
+Si no hay cambio, guardar la configuracion (write) y apagar/encender
+el router en el simulador para forzar un reinicio completo del
+proceso OSPF. Ahi si deberia cambiar, porque las interfaces loopback
+tienen prioridad sobre cualquier interfaz fisica para la eleccion del
+RID (sin importar el valor numerico de la IP), asi que el nuevo RID
+pasa a ser 192.168.1.X.
+
+Repetir la configuracion de loopback 0 (192.168.1.X, X = numero de
+router) en el resto de los routers, guardando la configuracion en
+cada uno, y reiniciar la simulacion.
+
+
+PASO 7 - ACTUALIZACION DE TABLAS DE ENRUTAMIENTO (DESPUES DE OSPF)
+------------------------------------------------------------------
+Una vez que la red este estable (esperar unos segundos), ejecutar
+show ip route en R1 y en otro router (por ejemplo R2).
+
+Ahora deberian aparecer entradas nuevas:
+  O    -> rutas intra-area (aprendidas dentro de la misma area)
+  O IA -> rutas inter-area (aprendidas a traves de un ABR, R2 o R3)
+
+Completar la tabla con tipo de entrada, metrica, red, mascara e IP
+del proximo salto para las entradas relevantes (nuevas, aprendidas
+por OSPF).
+
+PRUEBA DE CONECTIVIDAD:
+Repetir el ping desde un PC de Sucursal 1 a un PC de Casa Central.
+
+Resultado esperado: el ping ahora FUNCIONA correctamente.
+Justificacion: ya existen rutas OSPF end-to-end entre todas las
+redes de la maqueta.
+
+
+PASO 8 - CONFIGURACION DEL PROTOCOLO BGP
+---------------------------------------------
+Objetivo: inspeccionar los LSA de tipo 5. R1 es el ASBR del AS 64496
+y establece sesion BGP con R7 (AS 64497, cliente/ISP).
+
+R1:
+  conf t
+  router bgp 64496
+  neighbor 192.0.2.2 remote-as 64497
+  neighbor 192.0.2.2 activate
+
+R7:
+  conf t
+  router bgp 64497
+  neighbor 192.0.2.1 remote-as 64496
+  neighbor 192.0.2.1 activate
+
+Verificar que la vecindad BGP levanta (mensaje %BGP-5-ADJCHANGE).
+
+Configuracion completa en R1:
+  conf t
+  ip prefix-list PL-LAN-OUT seq 5 permit 172.16.0.0/24
+  ip prefix-list PL-LAN-OUT seq 10 permit 172.17.0.0/24
+  ip prefix-list PL-LAN-OUT seq 15 permit 172.18.0.0/24
+
+  route-map RM-ISP-OUT permit 10
+  match ip address prefix-list PL-LAN-OUT
+
+  ip prefix-list PL-DEFAULT-IN seq 5 permit 0.0.0.0/0
+  ip prefix-list PL-TEST-IN seq 10 permit 192.168.122.0/24
+
+  route-map RM-ISP-IN permit 10
+  match ip address prefix-list PL-DEFAULT-IN
+
+  route-map RM-ISP-IN permit 20
+  match ip address prefix-list PL-TEST-IN
+
+  router bgp 64496
+  neighbor 192.0.2.2 remote-as 64497
+  address-family ipv4
+  neighbor 192.0.2.2 route-map RM-ISP-IN in
+  neighbor 192.0.2.2 route-map RM-ISP-OUT out
+  network 172.16.0.0 mask 255.255.255.0
+  network 172.17.0.0 mask 255.255.255.0
+  network 172.18.0.0 mask 255.255.255.0
+  exit-address-family
+
+  router ospf 1
+  default-information originate
+
+  ip prefix-list PL-OSPF-REDIST seq 5 permit 192.168.122.0/24
+
+  route-map RM-BGP-TO-OSPF permit 10
+  match ip address prefix-list PL-OSPF-REDIST
+
+  router ospf 1
+  redistribute bgp 64496 subnets route-map RM-BGP-TO-OSPF
+
+Configuracion completa en R7:
+  conf t
+  ip prefix-list PL-CLIENTE-IN seq 5 permit 172.16.0.0/24
+  ip prefix-list PL-CLIENTE-IN seq 10 permit 172.17.0.0/24
+  ip prefix-list PL-CLIENTE-IN seq 15 permit 172.18.0.0/24
+  ip prefix-list PL-TEST-OUT seq 5 permit 192.168.122.0/24
+  ip prefix-list PL-DEFAULT-OUT seq 10 permit 0.0.0.0/0
+
+  route-map RM-CLIENTE-OUT permit 10
+  match ip address prefix-list PL-TEST-OUT
+
+  route-map RM-CLIENTE-OUT permit 20
+  match ip address prefix-list PL-DEFAULT-OUT
+
+  route-map RM-CLIENTE-IN permit 10
+  match ip address prefix-list PL-CLIENTE-IN
+
+  router bgp 64497
+  neighbor 192.0.2.1 remote-as 64496
+  neighbor 192.0.2.1 description PEERING_HACIA_R1_AS64496
+  address-family ipv4
+  neighbor 192.0.2.1 route-map RM-CLIENTE-IN in
+  neighbor 192.0.2.1 route-map RM-CLIENTE-OUT out
+  neighbor 192.0.2.1 default-originate
+  network 192.168.122.0 mask 255.255.255.0
+  exit-address-family
+
+
+PASO 9 - CONFIGURACION DEL NAT
+------------------------------------
+Realizar un traceroute desde un PC de alguna LAN de sucursales hacia
+la IP 8.8.8.8 (ANTES de configurar NAT).
+
+Resultado esperado: NO llega a destino. El traceroute llega hasta R7
+(o el primer salto detras, la puerta de enlace DHCP del nodo NAT) y
+ahi se corta.
+Pregunta "hasta que IP llega": la del primer salto detras de R7
+(gateway DHCP del NAT).
+Pregunta "que esta pasando": los paquetes salen con IP origen privada
+(172.17.x.x o 172.18.x.x), que no es enrutable en Internet real, asi
+que las respuestas nunca pueden volver.
+
+Aplicar esta configuracion en R7:
+  conf t
+  access-list 100 permit ip any any
+  ip nat inside source list 100 interface FastEthernet 0/0 overload
+  interface FastEthernet 0/0
+  ip nat outside
+  interface FastEthernet 1/0
+  ip nat inside
+
+Volver a probar el traceroute a 8.8.8.8.
+Resultado esperado: ahora SI llega a destino, porque el trafico sale
+con la IP publica de R7 (NAT overload/PAT).
+
+Conclusion a escribir: el NAT es necesario para que direcciones
+privadas puedan salir a Internet, traduciendo el origen a una IP
+publica.
+
+
+PASO 10 - ACTUALIZACION DE TABLA DE ENRUTAMIENTO (CON BGP)
+----------------------------------------------------------------
+Verificar show ip route en R1 y en R4, buscando las entradas nuevas.
+
+Deberian aparecer:
+  O*E2  -> ruta default (0.0.0.0/0) aprendida por OSPF como externa
+           tipo 2 (metrica fija = 1, inyectada por
+           default-information originate en R1)
+  O E2  -> red 192.168.122.0/24 redistribuida desde BGP hacia OSPF
+
+Pregunta "por que aparecen estas entradas": porque R1 es el ASBR y
+redistribuyo rutas aprendidas por BGP (la ruta default del ISP y la
+red de prueba 192.168.122.0/24) hacia el dominio OSPF, por lo que se
+propagan como LSA tipo 5 (externas) a toda la red interna, incluidas
+Area 1 y Area 2.
+
+
+PASO 11 - VERIFICACION DE LSAs
+------------------------------------
+Iniciar una captura de trafico entre R4 y R2, filtrando por "ospf"
+en Wireshark.
+
+En R1, reiniciar el proceso OSPF:
+  R1#clear ip ospf process
+  Reset ALL OSPF processes? [no]: yes
+
+Identificar en la captura los mensajes LS de tipo 3, 4 y 5:
+
+  Tipo 3 (Summary / Inter-Area LSA): generados por los ABR (R2, R3)
+  para llevar informacion de rutas de un area a otra. Ejemplo: R2
+  anuncia hacia Area 0 la red 172.17.0.0/24 de Area 1.
+
+  Tipo 4 (ASBR Summary LSA): generado por los ABR para indicarle a
+  las demas areas donde esta el ASBR (R1), ya que es el que
+  redistribuye BGP hacia OSPF.
+
+  Tipo 5 (AS External LSA): originado por R1 (ASBR) para las rutas
+  externas redistribuidas (la ruta default y 192.168.122.0/24). Se
+  inunda por todo el dominio OSPF (todas las areas, salvo que fueran
+  stub, que no es el caso aca).
+
+Verificar tambien con el comando:
+  R2#show ip ospf database
+Ahi se ven los LSA organizados por tipo, con su Link State ID y
+Advertising Router.
+
+
+PASO 12 - METRICAS ESTANDAR Y MODIFICACION
+------------------------------------------------
+Parado en R4 (o el router que corresponda), encontrar la metrica
+para llegar a 172.18.0.0/24 con dos comandos:
+  show ip ospf database <tipo> 172.18.0.0
+  show ip route
+
+Formula de costo OSPF por defecto en Cisco:
+  costo = ancho de banda de referencia (100.000 kbps) / ancho de
+          banda de la interfaz (kbps)
+
+Con interfaces Gigabit (1.000.000 kbps): costo = 100.000/1.000.000 =
+0,1, que redondea al minimo entero, 1. Por eso cada salto entre
+routers con interfaces Gigabit cuesta 1 por defecto, y la metrica
+total es igual a la cantidad de saltos del camino mas corto.
+
+Modificar la metrica del enlace R2-R1 (interfaz Gigabit2/0 en R2):
+  R2(config)#interface GigabitEthernet 2/0
+  R2(config-if)#ip ospf cost 10
+
+Alternativa a nivel global (ancho de banda de referencia):
+  R2(config)#router ospf 1
+  R2(config-router)#auto-cost reference-bandwidth 1000
+
+Volver a analizar la metrica desde R4 hacia 172.18.0.0/24.
+
+Justificacion esperada: al encarecer el enlace R2-R1, si existe un
+camino alternativo mas barato dentro de Area 0 (por ejemplo via R5:
+R2-R5-R3), OSPF va a recalcular y preferir ese camino. Importante:
+si "auto-cost reference-bandwidth" se cambia solo en R2 y no en el
+resto de los routers, los costos quedan inconsistentes entre
+routers del mismo dominio OSPF (cada uno calcula la metrica con una
+referencia distinta), lo cual en la practica real es un error comun
+de configuracion que conviene mencionar en la respuesta.
+
+
+PASO 13 - RESPUESTA DEL PROTOCOLO ANTE FALLAS
+----------------------------------------------------
+Desde el contenedor Debnet-1, hacer un traceroute hacia 8.8.8.8 y
+anotar el resultado.
+
+Iniciar una captura de trafico en el enlace entre R2 y R5, abrir
+Wireshark web y filtrar por el protocolo OSPF.
+
+En R2, bajar administrativamente la interfaz que conecta a R1
+(Gigabit2/0):
+  R2(config)#interface gigabitEthernet 2/0
+  R2(config-if)#shutdown
+
+Analizar la captura de consola y el LS Update generado.
+Esperado: R2 origina un nuevo Router-LSA reflejando que perdio ese
+enlace, y lo flooda hacia sus vecinos (R5, R4).
+
+Repetir el traceroute desde Debnet-1 hacia 8.8.8.8.
+
+Analisis esperado: el traceroute desde Debnet-1 NO deberia verse
+afectado, porque ese trafico nunca pasa por R2 (el camino es
+Debnet-1 -> R1 -> R7 -> Internet, directo). Lo que si cambia es como
+R2 llega al resto de la red: al perder su unico camino directo a R1,
+ahora todo el trafico de R2 hacia R1/R3/Casa Central pasa por R5.
+Justificar mostrando la tabla de ruteo de R2 con el nuevo proximo
+salto via R5.
+
+Volver a levantar la interfaz:
+  R2(config-if)#no shutdown
+
+Analizar el nuevo LSA que genera R2 al restaurar el enlace (nuevo
+Router-LSA con la interfaz de vuelta activa). El trafico deberia
+volver a preferir el camino directo R2-R1 por tener menor costo.
+
+
+NOTA IMPORTANTE
+------------------
+Los resultados reales de show ip route, show ip ospf neighbor,
+show ip ospf database y las capturas de Wireshark hay que sacarlos
+de la simulacion real en GNS3, corriendo cada comando y observando
+lo que efectivamente aparece en pantalla. Esta guia da los comandos
+correctos y el razonamiento esperado para poder completar las tablas
+y justificaciones del documento con lo que se observe en cada caso.
+
+
+FIN DE LA GUIA
