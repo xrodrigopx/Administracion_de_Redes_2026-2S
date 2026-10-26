@@ -36,3 +36,9 @@
 - 📘 [2026-11-16 Internet - Presentación de la tarea](2026-11-16%20Internet%20-%20Presentaci%C3%B3n%20de%20la%20tarea.md)
 - 📘 [2026-11-16 Presentación de Tarea](2026-11-16%20Presentaci%C3%B3n%20de%20Tarea.md)
 - 🚫 [2026-11-23 Segundo Parcial](2026-11-23%20Segundo%20Parcial.md) — **no hay clase**
+
+## Material adicional
+
+- 📝 [Resumen Primer Parcial](Resumen%20Primer%20Parcial.md) — resumen, ejemplos y preguntas de las clases del 03-08 al 07-09
+- 🧪 [Laboratorio 1 - Red L3 v18 (GNS3, OSPF)](2026-08-24-Laboratorio1-red_L3_v18-GNS3-OSPF.md) — enunciado del laboratorio 1
+- 🧪 [Guía paso a paso - Laboratorio 1 (OSPF/BGP/NAT)](guia-laboratorio1-ospf.txt)
